@@ -1,14 +1,15 @@
 import datetime
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, JobQueue # JobQueue'yu içe aktarın
 import os
 import logging
-from config import GREETING_IMAGES_DIR # Yeni eklenen görsel dizinini içe aktarın
-from commands.utils import delete_message_job # delete_message_job'u utils'ten içe aktarın
+
+from config import GREETING_IMAGES_DIR
+from commands.utils import delete_message_job
 
 logger = logging.getLogger(__name__)
 
-async def send_greeting_image(update: Update, context: ContextTypes.DEFAULT_TYPE, image_filename: str, display_name: str, user_id: int, caption: str = None) -> None:
+async def send_greeting_image(update: Update, context: ContextTypes.DEFAULT_TYPE, image_filename: str, display_name: str, user_id: int, job_queue: JobQueue, caption: str = None) -> None:
     """Belirtilen selamlama görselini gönderir veya bulunamazsa geçici bir hata mesajı verir."""
     image_path = os.path.join(GREETING_IMAGES_DIR, image_filename)
     chat_id = update.message.chat_id
@@ -36,7 +37,7 @@ async def send_greeting_image(update: Update, context: ContextTypes.DEFAULT_TYPE
     except FileNotFoundError:
         error_message_text = f"ZeaLouS: {display_name}, üzgünüm, selamlama görselini bulamadım: '{image_filename}'"
         sent_error_message = await update.message.reply_text(error_message_text)
-        context.job_queue.run_once(
+        job_queue.run_once( # Burası düzeltildi: context.job_queue yerine job_queue kullanıldı
             delete_message_job,
             5, # 5 saniye sonra silinecek
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
@@ -45,7 +46,7 @@ async def send_greeting_image(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         error_message_text = f"ZeaLouS: {display_name}, görsel gönderilirken bir hata oluştu: {e}"
         sent_error_message = await update.message.reply_text(error_message_text)
-        context.job_queue.run_once(
+        job_queue.run_once( # Burası düzeltildi: context.job_queue yerine job_queue kullanıldı
             delete_message_job,
             5, # 5 saniye sonra silinecek
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
