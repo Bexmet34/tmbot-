@@ -1,0 +1,22 @@
+<svg width="600" height="150" viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dış çerçeve: Sıcak turuncu/kahverengi -->
+  <rect x="0" y="0" width="100%" height="100%" fill="#D35400"/>
+  <!-- İç alan: Açık turuncu/gün doğumu -->
+  <rect x="5" y="5" width="590" height="140" fill="#E67E22"/>
+  
+  <!-- Stilize Güneş -->
+  <circle cx="200" cy="50" r="30" fill="#FFD700"/>
+  <line x1="200" y1="20" x2="200" y2="80" stroke="#FFD700" stroke-width="5" stroke-linecap="round"/>
+  <line x1="170" y1="50" x2="230" y2="50" stroke="#FFD700" stroke-width="5" stroke-linecap="round"/>
+  <line x1="177" y1="27" x2="222" y2="72" stroke="#FFD700" stroke-width="5" stroke-linecap="round"/>
+  <line x1="177" y1="72" x2="222" y2="27" stroke="#FFD700" stroke-width="5" stroke-linecap="round"/>
+  
+  <!-- Küçük köy silüeti -->
+  <path d="M380 115 L400 85 L420 115 Z M420 115 L440 90 L460 115 Z M460 115 L480 80 L500 115 Z" fill="#A0522D"/>
+  <rect x="370" y="115" width="140" height="10" fill="#6C3428"/>
+
+  <!-- İngilizce metin: AOE temasına uygun, kalın ve ortalanmış -->
+  <text x="300" y="85" dominant-baseline="middle" text-anchor="middle" font-family="Georgia, serif" font-size="40" font-weight="bold" fill="#6C3428">
+    Good Morning!
+  </text>
+</svg>

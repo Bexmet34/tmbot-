@@ -1,0 +1,19 @@
+<svg width="600" height="150" viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dış çerçeve: Yeşil/surlu taş rengi -->
+  <rect x="0" y="0" width="100%" height="100%" fill="#27AE60"/>
+  <!-- İç alan: Açık yeşil/otlak rengi -->
+  <rect x="5" y="5" width="590" height="140" fill="#2ECC71"/>
+  
+  <!-- Stilize Kılıç -->
+  <path d="M260 20 L270 10 L290 10 L300 20 L290 80 L270 80 Z" fill="#A9A9A9" stroke="#696969" stroke-width="2"/>
+  <rect x="275" y="80" width="10" height="20" fill="#8B4513" stroke="#696969" stroke-width="1"/>
+  
+  <!-- Stilize Kalkan -->
+  <path d="M340 30 L300 50 L300 80 L340 95 L380 80 L380 50 Z" fill="#8B0000" stroke="#5A0000" stroke-width="2"/>
+  <circle cx="340" cy="62.5" r="10" fill="#FFD700" stroke="#B8860B" stroke-width="1"/>
+  
+  <!-- İngilizce metin: AOE temasına uygun, kalın ve ortalanmış -->
+  <text x="50%" y="85%" dominant-baseline="middle" text-anchor="middle" font-family="Georgia, serif" font-size="40" font-weight="bold" fill="#34495E">
+    Hello!
+  </text>
+</svg>

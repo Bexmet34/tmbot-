@@ -1,0 +1,23 @@
+<svg width="600" height="150" viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dış çerçeve: Koyu gri/taş rengi -->
+  <rect x="0" y="0" width="100%" height="100%" fill="#34495E"/>
+  <!-- İç alan: Koyu mavi/gece gökyüzü -->
+  <rect x="5" y="5" width="590" height="140" fill="#2C3E50"/>
+
+  <!-- Stilize Ay -->
+  <circle cx="200" cy="50" r="30" fill="#ECF0F1"/>
+  <path d="M215 45 A 30 30 0 0 1 185 75 A 30 30 0 0 0 215 45 Z" fill="#2C3E50"/>
+  
+  <!-- Yıldızlar -->
+  <polygon points="260,30 265,40 275,42 265,44 260,54 255,44 245,42 255,40" fill="#FFD700"/>
+  <polygon points="230,20 233,25 238,26 233,27 230,32 227,27 222,26 227,25" fill="#FFD700"/>
+  <polygon points="290,50 293,55 298,56 293,57 290,62 287,57 282,56 287,55" fill="#FFD700"/>
+
+  <!-- Uzak Kale Silüeti (basit) -->
+  <path d="M380 115 L420 115 L420 95 L400 95 L400 80 L380 80 L380 95 L360 95 L360 80 L340 80 L340 95 L320 95 L320 115 Z" fill="#1C2A38"/>
+
+  <!-- İngilizce metin: AOE temasına uygun, kalın ve ortalanmış -->
+  <text x="300" y="85" dominant-baseline="middle" text-anchor="middle" font-family="Georgia, serif" font-size="40" font-weight="bold" fill="#ECF0F1">
+    Good Night!
+  </text>
+</svg>
