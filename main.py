@@ -371,7 +371,7 @@ async def hucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     try:
         with open(BITI_HUCUM_MP3_PATH, 'rb') as audio_file:
-            await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Biti Hücum Marşı çalıyor!")
+            await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Hücum Marşı çalıyor!")
         logger.info(f"[{datetime.datetime.now()}] Biti Hücum Marşı '{BITI_HUCUM_MP3_PATH}' başarıyla gönderildi ve sohbette bırakıldı.")
     except FileNotFoundError:
         logger.error(f"[{datetime.datetime.now()}] Biti Hücum Marşı dosyası bulunamadı: {BITI_HUCUM_MP3_PATH}")
