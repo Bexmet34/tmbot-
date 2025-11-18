@@ -40,7 +40,7 @@ async def send_greeting_image(update: Update, context: ContextTypes.DEFAULT_TYPE
         sent_error_message = await update.message.reply_text(error_message_text)
         job_queue.run_once( # Burası düzeltildi: context.job_queue yerine job_queue kullanıldı
             delete_message_job,
-            5, # 5 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
         logger.error(f"[{datetime.datetime.now()}] Görsel '{image_filename}' bulunamadı. Kullanıcıya hata mesajı gönderildi ve silinmesi zamanlandı.")
@@ -50,7 +50,7 @@ async def send_greeting_image(update: Update, context: ContextTypes.DEFAULT_TYPE
         sent_error_message = await update.message.reply_text(error_message_text)
         job_queue.run_once( # Burası düzeltildi: context.job_queue yerine job_queue kullanıldı
             delete_message_job,
-            5, # 5 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
         logger.error(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id})'ye görsel '{image_filename}' gönderilirken hata oluştu: {e}. Hata mesajı silinmek üzere zamanlandı.")

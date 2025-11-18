@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, JobQueue
 import datetime
 import logging
-import json # JSON modülü kullanılmamış, ancak import edilmişti. İhtiyaç yoksa kaldırılabilir.
+import json
 
 from commands import database
 from commands.utils import get_user_display_name_and_storage_name, delete_message_job
@@ -106,7 +106,7 @@ async def send_statistics_message(update: Update, context: ContextTypes.DEFAULT_
         sent_error = await context.bot.send_message(chat_id=chat_id, text=error_msg)
         context.job_queue.run_once(
             delete_message_job,
-            7,
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error.chat_id, 'message_id': sent_error.message_id}
         )
 
@@ -173,7 +173,7 @@ async def handle_stats_callback(update: Update, context: ContextTypes.DEFAULT_TY
         sent_error = await context.bot.send_message(chat_id=chat_id, text=error_msg)
         context.job_queue.run_once(
             delete_message_job,
-            7,
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error.chat_id, 'message_id': sent_error.message_id}
         )
 

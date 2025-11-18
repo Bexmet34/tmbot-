@@ -124,7 +124,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             sent_warning_message = await update.message.reply_text(warning_message_text)
             context.job_queue.run_once(
                 delete_message_job, # commands.utils.delete_message_job kullanıldı
-                7, # 7 saniye sonra silinecek
+                15, # 15 saniye sonra silinecek
                 data={'chat_id': sent_warning_message.chat_id, 'message_id': sent_warning_message.message_id}
             )
             await update.message.delete()
@@ -154,7 +154,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     sent_punishment_message = await update.message.reply_text(punishment_message_text)
                     context.job_queue.run_once(
                         delete_message_job, # commands.utils.delete_message_job kullanıldı
-                        7, # 7 saniye sonra silinecek
+                        15, # 15 saniye sonra silinecek
                         data={'chat_id': sent_punishment_message.chat_id, 'message_id': sent_punishment_message.message_id}
                     )
 
@@ -188,12 +188,13 @@ async def statistics_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /istatistik komutunu kullandı. Detaylı istatistikler gönderiliyor.")
     try:
-        await stats.send_statistics_message(update, context, chat_id) # Yeni stats modülünü kullan
+        # İstatistik mesajı kalıcı kalacak (butonlar için)
+        await stats.send_statistics_message(update, context, chat_id)
     except Exception as e:
         logger.error(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) için istatistik mesajı gönderilirken hata oluştu: {e}")
         error_msg = f"ZeaLouS: Üzgünüm, istatistikler şu anda gösterilemiyor. Bir hata oluştu."
         sent_error = await context.bot.send_message(chat_id=chat_id, text=error_msg)
-        context.job_queue.run_once(delete_message_job, 7, data={'chat_id': sent_error.chat_id, 'message_id': sent_error.message_id})
+        context.job_queue.run_once(delete_message_job, 15, data={'chat_id': sent_error.chat_id, 'message_id': sent_error.message_id}) # Hata mesajı 15 saniye sonra silinecek
 
 
 async def game_time_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -203,7 +204,7 @@ async def game_time_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     sent_message = await update.message.reply_text(f"ZeaLouS: {game_time}")
     context.job_queue.run_once(
         delete_message_job,
-        7, # 7 saniye sonra silinecek
+        15, # 15 saniye sonra silinecek olarak güncellendi
         data={'chat_id': sent_message.chat_id, 'message_id': sent_message.message_id}
     )
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {get_user_display_name_and_storage_name(update)[1]} /oyunsaati komutunu kullandı. Yanıt mesajı silinmek üzere zamanlandı.")
@@ -265,7 +266,7 @@ async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if sent_photo_message: # Eğer görsel başarıyla gönderildiyse, onu silinmek üzere zamanla
         context.job_queue.run_once(
             delete_message_job,
-            7, # 7 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
         )
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /hello komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
@@ -279,7 +280,7 @@ async def goodmorning_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if sent_photo_message:
         context.job_queue.run_once(
             delete_message_job,
-            7, # 7 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
         )
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /goodmorning komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
@@ -293,7 +294,7 @@ async def goodnight_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if sent_photo_message:
         context.job_queue.run_once(
             delete_message_job,
-            7, # 7 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
         )
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /goodnight komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
@@ -308,7 +309,7 @@ async def welcome_command_svg(update: Update, context: ContextTypes.DEFAULT_TYPE
     if sent_photo_message:
         context.job_queue.run_once(
             delete_message_job,
-            7, # 7 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
         )
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /welcome komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
@@ -349,7 +350,7 @@ async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         sent_error_message = await update.message.reply_text("ZeaLouS: Mehter Marşı dosyası bulunamadı.")
         context.job_queue.run_once(
             delete_message_job,
-            7, # 7 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
     except Exception as e:
@@ -357,17 +358,17 @@ async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         sent_error_message = await update.message.reply_text("ZeaLouS: Mehter Marşı gönderilirken bir hata oluştu.")
         context.job_queue.run_once(
             delete_message_job,
-            7, # 7 saniye sonra silinecek
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
 
 
-async def hucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Fonksiyon adı bitihucum_command'den hucum_command olarak değişti
+async def hucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Biti Hücum Marşı MP3'ünü gönderir, komut mesajını siler ancak gönderilen sesi bırakır."""
     await update.message.delete()
     chat_id = update.message.chat_id
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
-    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /hucum komutunu kullandı.") # Log mesajı güncellendi
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /hucum komutunu kullandı.")
     
     try:
         with open(BITI_HUCUM_MP3_PATH, 'rb') as audio_file:
@@ -378,7 +379,7 @@ async def hucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         sent_error_message = await update.message.reply_text("ZeaLouS: Biti Hücum Marşı dosyası bulunamadı.")
         context.job_queue.run_once(
             delete_message_job,
-            7,
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
     except Exception as e:
@@ -386,7 +387,7 @@ async def hucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         sent_error_message = await update.message.reply_text("ZeaLouS: Biti Hücum Marşı gönderilirken bir hata oluştu.")
         context.job_queue.run_once(
             delete_message_job,
-            7,
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
 
@@ -407,7 +408,7 @@ async def cenk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         sent_error_message = await update.message.reply_text("ZeaLouS: Cenk Marşı dosyası bulunamadı.")
         context.job_queue.run_once(
             delete_message_job,
-            7,
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
     except Exception as e:
@@ -415,7 +416,7 @@ async def cenk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         sent_error_message = await update.message.reply_text("ZeaLouS: Cenk Marşı gönderilirken bir hata oluştu.")
         context.job_queue.run_once(
             delete_message_job,
-            7,
+            15, # 15 saniye sonra silinecek olarak güncellendi
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
 
