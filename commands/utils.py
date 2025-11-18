@@ -2,6 +2,11 @@ import datetime
 import re
 from telegram import Update
 from config import ADMIN_IDS # ADMIN_IDS'i config'den içe aktar
+from telegram import Update
+from telegram.ext import ContextTypes
+import logging
+
+logger = logging.getLogger(__name__) # utils modülü için de loglama yapılandırın
 
 def get_user_display_name_and_storage_name(update: Update) -> tuple[str, str, str]:
     """
@@ -57,3 +62,14 @@ def get_user_display_name_and_storage_name(update: Update) -> tuple[str, str, st
 def is_admin(user_id: str) -> bool:
     """Verilen user_id'nin bir yönetici olup olmadığını kontrol eder."""
     return user_id in ADMIN_IDS
+
+async def delete_message_job(context: ContextTypes.DEFAULT_TYPE):
+    """Belirli bir mesajı gecikmeli olarak silmek için zamanlanmış iş."""
+    job_data = context.job.data
+    chat_id = job_data['chat_id']
+    message_id = job_data['message_id']
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        logger.debug(f"[{datetime.datetime.now()}] Mesaj {message_id} (sohbet {chat_id}) başarıyla silindi.")
+    except Exception as e:
+        logger.error(f"[{datetime.datetime.now()}] Mesaj {message_id} (sohbet {chat_id}) silinirken hata oluştu: {e}")
