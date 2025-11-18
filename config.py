@@ -10,7 +10,7 @@ FORBIDDEN_WORDS_FILE = os.path.join(os.path.dirname(__file__), 'yasakli.txt')
 GAME_SERVER_UTC_OFFSET_HOURS = 0 # Kullanıcının belirleyeceği sunucu saati farkı (örnek olarak UTC+0)
 BOT_TOKEN = "8154263807:AAHK2apy8aI-wYygzGTxKcyjXegL1II15N4"
 
-# Yönetici ID'leri (Bot'un adminleri)
+## Yönetici ID'leri (Bot'un adminleri)
 ADMIN_IDS = ["5104018162", "1087968824"] # Yönetici yetkisi vereceğiniz kullanıcıların ID'lerini buraya ekleyin
 
 # Veritabanı dosyasının yolu
@@ -21,7 +21,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'bot_data.db') # Eklendi: Veri
 MEHTER_MP3_PATH = os.path.join(os.path.dirname(__file__), 'music', 'mehter.mp3') # Eklendi: Mehter Marşı yolu
 
 # Biti Hücum MP3 dosyasının yolu
-BITI_HUCUM_MP3_PATH = os.path.join(os.path.dirname(__file__), 'music', 'bitihucum.mp3') # Eklendi
+BITI_HUCUM_MP3_PATH = os.path.join(os.path.dirname(__file__), 'music', 'hucum.mp3') # Dosya adı 'hucum.mp3' olarak düzeltildi
 
 # Cenk MP3 dosyasının yolu
 CENK_MP3_PATH = os.path.join(os.path.dirname(__file__), 'music', 'cenk.mp3') # Eklendi

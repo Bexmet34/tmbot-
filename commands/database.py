@@ -2,6 +2,7 @@ import sqlite3
 import datetime
 import logging
 import json
+from collections import defaultdict # Import eklendi
 
 from config import DB_PATH
 
@@ -61,15 +62,18 @@ def create_tables():
     conn.close()
     logger.info("Veritabanı tabloları kontrol edildi/oluşturuldu.")
 
-def update_user_info(user_id: str, username: str, first_name: str = None, last_name: str = None, is_bot: bool = False):
+def update_user_info(user_id: str, username: str | None, first_name: str | None, last_name: str | None, is_bot: bool):
     """Kullanıcı bilgilerini günceller veya ekler."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    display_name = first_name if first_name else username
+    # display_name'i daha doğru oluştur
+    display_name = first_name if first_name else "Bilinmeyen Kullanıcı"
     if last_name:
         display_name += f" {last_name}"
-
+    elif username: # Eğer first_name yoksa ve username varsa, display_name olarak username'i kullan
+        display_name = username
+    
     cursor.execute('''
         INSERT OR REPLACE INTO users 
         (user_id, username, display_name, first_name, last_name, is_bot, last_activity)
@@ -241,11 +245,8 @@ def get_user_stats(user_id: str) -> dict:
     cursor = conn.cursor()
 
     user_info = cursor.execute('SELECT display_name FROM users WHERE user_id = ?', (user_id,)).fetchone()
-    if not user_info:
-        conn.close()
-        return {'display_name': 'Bilinmeyen Kullanıcı', 'message_count': 0, 'strike_count': 0, 'is_muted': False, 'mute_until': None}
-
-    display_name = user_info['display_name']
+    # Eğer kullanıcı bilgisi yoksa, varsayılan bir display_name kullan
+    display_name = user_info['display_name'] if user_info else f"Kullanıcı {user_id}"
 
     message_count = cursor.execute(
         'SELECT COUNT(*) FROM messages WHERE user_id = ?', (user_id,)

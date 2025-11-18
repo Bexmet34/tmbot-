@@ -6,7 +6,8 @@ import re
 from collections import Counter, defaultdict
 
 # Kendi komut modüllerinizi içe aktarın
-from config import BOT_TOKEN, GAME_SERVER_UTC_OFFSET_HOURS, ADMIN_IDS, MEHTER_MP3_PATH, BITI_HUCUM_MP3_PATH, CENK_MP3_PATH, GREETING_IMAGES_DIR # GREETING_IMAGES_DIR ekliydi, GREETING diye bir şey yoktu. BITI_HUCUM_MP3_PATH, CENK_MP3_PATH eklendi
+# GREETING_IMAGES_DIR ekliydi, GREETING diye bir şey yoktu. BITI_HUCUM_MP3_PATH, CENK_MP3_PATH eklendi
+from config import BOT_TOKEN, GAME_SERVER_UTC_OFFSET_HOURS, ADMIN_IDS, MEHTER_MP3_PATH, BITI_HUCUM_MP3_PATH, CENK_MP3_PATH, GREETING_IMAGES_DIR
 from commands.swear_filter import check_for_swears, load_forbidden_words_from_file
 from commands.notes import handle_note_command as notes_handler
 from commands.reminders import handle_reminder_command as reminders_handler
@@ -46,19 +47,23 @@ async def check_reminders(context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Bot başlatıldığında gönderilecek mesaj."""
+    user = update.effective_user # Kullanıcı objesini al
     user_id, display_name, user_name_for_storage = get_user_display_name_and_storage_name(update)
-    database.update_user_info(user_id, user_name_for_storage)
+    # database.update_user_info çağrısı güncellendi
+    database.update_user_info(user_id, user.username, user.first_name, user.last_name, user.is_bot)
     help_hint = "Komutları görmek için `/help` yazabilirsiniz."
     await update.message.reply_text(f'Merhaba {display_name}! Ben ZeaLouS, mesajlarınızı kontrol etmek ve komutlarınızı işlemek için buradayım. {help_hint}')
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message and update.message.text:
+        user = update.effective_user # Kullanıcı objesini al
         user_id, display_name, user_name_for_storage = get_user_display_name_and_storage_name(update)
         message_content = update.message.text
         now = datetime.datetime.now()
 
-        database.update_user_info(user_id, user_name_for_storage)
+        # database.update_user_info çağrısı güncellendi
+        database.update_user_info(user_id, user.username, user.first_name, user.last_name, user.is_bot)
         
         logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) mesaj gönderdi: '{message_content}'")
 
@@ -182,7 +187,13 @@ async def statistics_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = update.message.chat_id
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /istatistik komutunu kullandı. Detaylı istatistikler gönderiliyor.")
-    await stats.send_statistics_message(update, context, chat_id) # Yeni stats modülünü kullan
+    try:
+        await stats.send_statistics_message(update, context, chat_id) # Yeni stats modülünü kullan
+    except Exception as e:
+        logger.error(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) için istatistik mesajı gönderilirken hata oluştu: {e}")
+        error_msg = f"ZeaLouS: Üzgünüm, istatistikler şu anda gösterilemiyor. Bir hata oluştu."
+        sent_error = await context.bot.send_message(chat_id=chat_id, text=error_msg)
+        context.job_queue.run_once(delete_message_job, 7, data={'chat_id': sent_error.chat_id, 'message_id': sent_error.message_id})
 
 
 async def game_time_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -351,7 +362,7 @@ async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
 
-async def bitihucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def hucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: # Fonksiyon adı bitihucum_command'den hucum_command olarak değişti
     """Biti Hücum Marşı MP3'ünü gönderir, komut mesajını siler ancak gönderilen sesi bırakır."""
     await update.message.delete()
     chat_id = update.message.chat_id
@@ -431,7 +442,7 @@ def main() -> None:
 
     application.add_handler(CommandHandler("cezatemizle", clear_punishments_command))
     application.add_handler(CommandHandler("mehter", mehter_command))
-    application.add_handler(CommandHandler("hucum", bitihucum_command)) # Komut adı /hucum olarak değiştirildi
+    application.add_handler(CommandHandler("hucum", hucum_command)) # Komut adı ve handler /hucum olarak değiştirildi
     application.add_handler(CommandHandler("cenk", cenk_command))
 
     # Yeni: İstatistik butonları için CallbackQueryHandler eklendi
