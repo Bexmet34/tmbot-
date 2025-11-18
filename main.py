@@ -212,7 +212,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "**📝 Kişisel Araçlar:**\n"
         "📝 /not <metin> - Kendinize özel bir not kaydeder.\n"
         "⏰ /hatirlat <metin> [tarih] saat - Belirttiğiniz zamanda size bir hatırlatma gönderir.\n"
-        "📊 /istatistik - Sohbet odasının detaylı istatistiklerini gösterir.\n\n" # Güncellendi
+        "📊 /istatistik - Sohbet odasının detaylı istatistiklerini gösterir.\n\n"
         
         "**🎮 Eğlence ve Selamlamalar:**\n"
         "🕒 /oyunsaati - Oyun sunucusunun saatini gösterir.\n"
@@ -227,10 +227,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if is_admin(user_id):
         help_text += (
             "**🛡️ Yönetici Komutları:**\n"
-            "⚠️ /cezatemizle <kullanıcı_id_veya_adı> - Belirtilen kullanıcının tüm cezalarını sıfırlar.\n"
+            "⚠️ /cezatemizle `[kullanıcı_id_veya_adı]` - Belirtilen kullanıcının tüm cezalarını sıfırlar.\n" # Burası düzeltildi
         )
 
-    await update.message.reply_text(help_text, parse_mode='Markdown') # Markdown desteği eklendi
+    await update.message.reply_text(help_text, parse_mode='Markdown')
 
 
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
