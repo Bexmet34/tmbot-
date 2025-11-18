@@ -232,7 +232,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "😴 /goodnight - 'İyi Geceler' görseli gönderir.\n"
         "🎉 /welcome - 'Hoş Geldin' görseli gönderir.\n"
         "🥁 /mehter - Bir Mehter Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n"
-        "🎺 /hucum - 'Biti Hücum' Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n" # Komut adı /hucum olarak değiştirildi
+        "🎺 /hucum - 'Hücum' Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n" # Komut adı /hucum olarak değiştirildi
         "⚔️ /cenk - 'Cenk' Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n\n"
     )
     
