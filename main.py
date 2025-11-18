@@ -321,7 +321,7 @@ async def clear_punishments_command(update: Update, context: ContextTypes.DEFAUL
 
 
 async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Mehter Marşı MP3'ünü gönderir, komut mesajını ve gönderilen sesi siler."""
+    """Mehter Marşı MP3'ünü gönderir, komut mesajını siler ancak gönderilen sesi bırakır."""
     await update.message.delete() # Kullanıcının komut mesajını sil
     chat_id = update.message.chat_id
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
@@ -329,13 +329,9 @@ async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     try:
         with open(MEHTER_MP3_PATH, 'rb') as audio_file:
-            sent_audio_message = await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Mehter Marşı çalıyor!")
-            context.job_queue.run_once(
-                delete_message_job,
-                7, # 7 saniye sonra silinecek
-                data={'chat_id': sent_audio_message.chat_id, 'message_id': sent_audio_message.message_id}
-            )
-        logger.info(f"[{datetime.datetime.now()}] Mehter Marşı '{MEHTER_MP3_PATH}' başarıyla gönderildi ve silinmek üzere zamanlandı.")
+            await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Mehter Marşı çalıyor!")
+            # MP3 mesajının otomatik silinmesini sağlayan kısım kaldırıldı.
+        logger.info(f"[{datetime.datetime.now()}] Mehter Marşı '{MEHTER_MP3_PATH}' başarıyla gönderildi ve sohbette bırakıldı.")
     except FileNotFoundError:
         logger.error(f"[{datetime.datetime.now()}] Mehter Marşı dosyası bulunamadı: {MEHTER_MP3_PATH}")
         sent_error_message = await update.message.reply_text("ZeaLouS: Mehter Marşı dosyası bulunamadı.")
