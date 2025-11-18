@@ -20,5 +20,11 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'bot_data.db') # Eklendi: Veri
 # Mehter Marşı MP3 dosyasının yolu
 MEHTER_MP3_PATH = os.path.join(os.path.dirname(__file__), 'music', 'mehter.mp3') # Eklendi: Mehter Marşı yolu
 
+# Biti Hücum MP3 dosyasının yolu
+BITI_HUCUM_MP3_PATH = os.path.join(os.path.dirname(__file__), 'music', 'bitihucum.mp3') # Eklendi
+
+# Cenk MP3 dosyasının yolu
+CENK_MP3_PATH = os.path.join(os.path.dirname(__file__), 'music', 'cenk.mp3') # Eklendi
+
 # Selamlama Görsellerinin bulunduğu dizin yolu
 GREETING_IMAGES_DIR = os.path.join(os.path.dirname(__file__), 'greetings') # Eklendi: Selamlama görselleri yolu

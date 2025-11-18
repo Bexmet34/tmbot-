@@ -6,7 +6,7 @@ import re
 from collections import Counter, defaultdict
 
 # Kendi komut modüllerinizi içe aktarın
-from config import BOT_TOKEN, GAME_SERVER_UTC_OFFSET_HOURS, ADMIN_IDS, MEHTER_MP3_PATH, GREETING_IMAGES_DIR
+from config import BOT_TOKEN, GAME_SERVER_UTC_OFFSET_HOURS, ADMIN_IDS, MEHTER_MP3_PATH, BITI_HUCUM_MP3_PATH, CENK_MP3_PATH, GREETING_IMAGES_DIR # GREETING_IMAGES_DIR ekliydi, GREETING diye bir şey yoktu. BITI_HUCUM_MP3_PATH, CENK_MP3_PATH eklendi
 from commands.swear_filter import check_for_swears, load_forbidden_words_from_file
 from commands.notes import handle_note_command as notes_handler
 from commands.reminders import handle_reminder_command as reminders_handler
@@ -154,7 +154,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     )
 
                     try:
-                        # Kullanıcıya özel detaylı ceza bildirimi gönder (bu mesaj kalıcı kalabilir)
+                        # Kullanıcıya özel detaylı ceza bildirimi gönder (bu mesaj kalıcı olabilir)
                         await context.bot.send_message(chat_id=user_id, text=f"ZeaLouS: Ceza aldınız. Süre: {mute_duration}. Kuralları gözden geçirin: /rules")
                     except Exception as e:
                         logger.warning(f"[{now}] Kullanıcı {display_name} ({user_id})'ye özel ceza mesajı gönderilirken hata oluştu: {e}")
@@ -220,14 +220,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "☀️ /goodmorning - 'Günaydın' görseli gönderir.\n"
         "😴 /goodnight - 'İyi Geceler' görseli gönderir.\n"
         "🎉 /welcome - 'Hoş Geldin' görseli gönderir.\n"
-        "🥁 /mehter - Bir Mehter Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n\n"
+        "🥁 /mehter - Bir Mehter Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n"
+        "🎺 /hucum - 'Biti Hücum' Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n" # Komut adı /hucum olarak değiştirildi
+        "⚔️ /cenk - 'Cenk' Marşı MP3'ü çalar (çalmak için dokunmanız gerekir).\n\n"
     )
     
     # Yönetici komutlarını sadece adminlere göster
     if is_admin(user_id):
         help_text += (
             "**🛡️ Yönetici Komutları:**\n"
-            "⚠️ /cezatemizle `[kullanıcı_id_veya_adı]` - Belirtilen kullanıcının tüm cezalarını sıfırlar.\n" # Burası düzeltildi
+            "⚠️ /cezatemizle `[kullanıcı_id_veya_adı]` - Belirtilen kullanıcının tüm cezalarını sıfırlar.\n"
         )
 
     await update.message.reply_text(help_text, parse_mode='Markdown')
@@ -330,7 +332,6 @@ async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         with open(MEHTER_MP3_PATH, 'rb') as audio_file:
             await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Mehter Marşı çalıyor!")
-            # MP3 mesajının otomatik silinmesini sağlayan kısım kaldırıldı.
         logger.info(f"[{datetime.datetime.now()}] Mehter Marşı '{MEHTER_MP3_PATH}' başarıyla gönderildi ve sohbette bırakıldı.")
     except FileNotFoundError:
         logger.error(f"[{datetime.datetime.now()}] Mehter Marşı dosyası bulunamadı: {MEHTER_MP3_PATH}")
@@ -346,6 +347,64 @@ async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.job_queue.run_once(
             delete_message_job,
             7, # 7 saniye sonra silinecek
+            data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
+        )
+
+
+async def bitihucum_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Biti Hücum Marşı MP3'ünü gönderir, komut mesajını siler ancak gönderilen sesi bırakır."""
+    await update.message.delete()
+    chat_id = update.message.chat_id
+    user_id, display_name, _ = get_user_display_name_and_storage_name(update)
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /hucum komutunu kullandı.") # Log mesajı güncellendi
+    
+    try:
+        with open(BITI_HUCUM_MP3_PATH, 'rb') as audio_file:
+            await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Biti Hücum Marşı çalıyor!")
+        logger.info(f"[{datetime.datetime.now()}] Biti Hücum Marşı '{BITI_HUCUM_MP3_PATH}' başarıyla gönderildi ve sohbette bırakıldı.")
+    except FileNotFoundError:
+        logger.error(f"[{datetime.datetime.now()}] Biti Hücum Marşı dosyası bulunamadı: {BITI_HUCUM_MP3_PATH}")
+        sent_error_message = await update.message.reply_text("ZeaLouS: Biti Hücum Marşı dosyası bulunamadı.")
+        context.job_queue.run_once(
+            delete_message_job,
+            7,
+            data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
+        )
+    except Exception as e:
+        logger.error(f"[{datetime.datetime.now()}] Biti Hücum Marşı gönderilirken hata oluştu: {e}")
+        sent_error_message = await update.message.reply_text("ZeaLouS: Biti Hücum Marşı gönderilirken bir hata oluştu.")
+        context.job_queue.run_once(
+            delete_message_job,
+            7,
+            data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
+        )
+
+
+async def cenk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cenk Marşı MP3'ünü gönderir, komut mesajını siler ancak gönderilen sesi bırakır."""
+    await update.message.delete()
+    chat_id = update.message.chat_id
+    user_id, display_name, _ = get_user_display_name_and_storage_name(update)
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /cenk komutunu kullandı.")
+    
+    try:
+        with open(CENK_MP3_PATH, 'rb') as audio_file:
+            await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Cenk Marşı çalıyor!")
+        logger.info(f"[{datetime.datetime.now()}] Cenk Marşı '{CENK_MP3_PATH}' başarıyla gönderildi ve sohbette bırakıldı.")
+    except FileNotFoundError:
+        logger.error(f"[{datetime.datetime.now()}] Cenk Marşı dosyası bulunamadı: {CENK_MP3_PATH}")
+        sent_error_message = await update.message.reply_text("ZeaLouS: Cenk Marşı dosyası bulunamadı.")
+        context.job_queue.run_once(
+            delete_message_job,
+            7,
+            data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
+        )
+    except Exception as e:
+        logger.error(f"[{datetime.datetime.now()}] Cenk Marşı gönderilirken hata oluştu: {e}")
+        sent_error_message = await update.message.reply_text("ZeaLouS: Cenk Marşı gönderilirken bir hata oluştu.")
+        context.job_queue.run_once(
+            delete_message_job,
+            7,
             data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
         )
 
@@ -372,6 +431,8 @@ def main() -> None:
 
     application.add_handler(CommandHandler("cezatemizle", clear_punishments_command))
     application.add_handler(CommandHandler("mehter", mehter_command))
+    application.add_handler(CommandHandler("hucum", bitihucum_command)) # Komut adı /hucum olarak değiştirildi
+    application.add_handler(CommandHandler("cenk", cenk_command))
 
     # Yeni: İstatistik butonları için CallbackQueryHandler eklendi
     application.add_handler(CallbackQueryHandler(stats.handle_stats_callback, pattern='^stats_'))
