@@ -1,21 +1,20 @@
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, JobQueue
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes, JobQueue
 import logging
 import datetime
 import re
 from collections import Counter, defaultdict
 
 # Kendi komut modüllerinizi içe aktarın
-from config import BOT_TOKEN, GAME_SERVER_UTC_OFFSET_HOURS, ADMIN_IDS, MEHTER_MP3_PATH, GREETING_IMAGES_DIR # ADMIN_IDS, MEHTER_MP3_PATH ve GREETING_IMAGES_DIR eklendi
+from config import BOT_TOKEN, GAME_SERVER_UTC_OFFSET_HOURS, ADMIN_IDS, MEHTER_MP3_PATH, GREETING_IMAGES_DIR
 from commands.swear_filter import check_for_swears, load_forbidden_words_from_file
 from commands.notes import handle_note_command as notes_handler
 from commands.reminders import handle_reminder_command as reminders_handler
 from commands.game_time import get_game_server_time
 from commands.greetings import send_greeting_image
-from commands.utils import get_user_display_name_and_storage_name, is_admin, delete_message_job # Eklendi: delete_message_job
-
-# Eklendi: Veritabanı modülü
-from commands import database
+from commands.utils import get_user_display_name_and_storage_name, is_admin, delete_message_job
+from commands import database # Eklendi: Veritabanı modülü
+from commands import stats # Eklendi: İstatistik modülü
 
 # Loglama ayarlarını yapılandırın
 logging.basicConfig(
@@ -178,14 +177,25 @@ async def reminders_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def statistics_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Detaylı istatistikleri butonlarla birlikte gönderir ve komut mesajını siler."""
+    await update.message.delete() # Kullanıcının komut mesajını sil
+    chat_id = update.message.chat_id
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
-    stats = database.get_statistics(user_id) # Doğrudan veritabanı modülü kullanıldı
-    await update.message.reply_text(f"ZeaLouS:\n{stats}")
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /istatistik komutunu kullandı. Detaylı istatistikler gönderiliyor.")
+    await stats.send_statistics_message(update, context, chat_id) # Yeni stats modülünü kullan
 
 
 async def game_time_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Oyun sunucusunun saatini gösterir ve komut mesajını siler."""
+    await update.message.delete() # Kullanıcının komut mesajını sil
     game_time = get_game_server_time()
-    await update.message.reply_text(f"ZeaLouS: {game_time}")
+    sent_message = await update.message.reply_text(f"ZeaLouS: {game_time}")
+    context.job_queue.run_once(
+        delete_message_job,
+        7, # 7 saniye sonra silinecek
+        data={'chat_id': sent_message.chat_id, 'message_id': sent_message.message_id}
+    )
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {get_user_display_name_and_storage_name(update)[1]} /oyunsaati komutunu kullandı. Yanıt mesajı silinmek üzere zamanlandı.")
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -202,7 +212,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "**📝 Kişisel Araçlar:**\n"
         "📝 /not <metin> - Kendinize özel bir not kaydeder.\n"
         "⏰ /hatirlat <metin> [tarih] saat - Belirttiğiniz zamanda size bir hatırlatma gönderir.\n"
-        "📊 /istatistik - Mesaj gönderme istatistiklerinizi gösterir.\n\n"
+        "📊 /istatistik - Sohbet odasının detaylı istatistiklerini gösterir.\n\n" # Güncellendi
         
         "**🎮 Eğlence ve Selamlamalar:**\n"
         "🕒 /oyunsaati - Oyun sunucusunun saatini gösterir.\n"
@@ -220,7 +230,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "⚠️ /cezatemizle <kullanıcı_id_veya_adı> - Belirtilen kullanıcının tüm cezalarını sıfırlar.\n"
         )
 
-    await update.message.reply_text(help_text)
+    await update.message.reply_text(help_text, parse_mode='Markdown') # Markdown desteği eklendi
 
 
 async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -235,28 +245,60 @@ async def rules_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def hello_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """'Merhaba' görseli gönderir ve komut mesajını siler."""
+    await update.message.delete() # Kullanıcının komut mesajını sil
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
-    # job_queue ve GREETING_IMAGES_DIR parametreleri eklendi
-    await send_greeting_image(update, context, 'hello.png', display_name, user_id, context.job_queue)
+    sent_photo_message = await send_greeting_image(update, context, 'hello.png', display_name, user_id, context.job_queue)
+    if sent_photo_message: # Eğer görsel başarıyla gönderildiyse, onu silinmek üzere zamanla
+        context.job_queue.run_once(
+            delete_message_job,
+            7, # 7 saniye sonra silinecek
+            data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
+        )
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /hello komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
 
 
 async def goodmorning_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """'Günaydın' görseli gönderir ve komut mesajını siler."""
+    await update.message.delete() # Kullanıcının komut mesajını sil
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
-    # job_queue ve GREETING_IMAGES_DIR parametreleri eklendi
-    await send_greeting_image(update, context, 'goodmorning.png', display_name, user_id, context.job_queue)
+    sent_photo_message = await send_greeting_image(update, context, 'goodmorning.png', display_name, user_id, context.job_queue)
+    if sent_photo_message:
+        context.job_queue.run_once(
+            delete_message_job,
+            7, # 7 saniye sonra silinecek
+            data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
+        )
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /goodmorning komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
 
 
 async def goodnight_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """'İyi Geceler' görseli gönderir ve komut mesajını siler."""
+    await update.message.delete() # Kullanıcının komut mesajını sil
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
-    # job_queue ve GREETING_IMAGES_DIR parametreleri eklendi
-    await send_greeting_image(update, context, 'goodnight.png', display_name, user_id, context.job_queue)
+    sent_photo_message = await send_greeting_image(update, context, 'goodnight.png', display_name, user_id, context.job_queue)
+    if sent_photo_message:
+        context.job_queue.run_once(
+            delete_message_job,
+            7, # 7 saniye sonra silinecek
+            data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
+        )
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /goodnight komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
 
 
 async def welcome_command_svg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """'Hoş Geldin' görseli gönderir ve komut mesajını siler."""
+    await update.message.delete() # Kullanıcının komut mesajını sil
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
     caption = f"ZeaLouS: {display_name}, topluluğa hoş geldin!"
-    # job_queue ve GREETING_IMAGES_DIR parametreleri eklendi
-    await send_greeting_image(update, context, 'welcome.png', display_name, user_id, context.job_queue, caption=caption)
+    sent_photo_message = await send_greeting_image(update, context, 'welcome.png', display_name, user_id, context.job_queue, caption=caption)
+    if sent_photo_message:
+        context.job_queue.run_once(
+            delete_message_job,
+            7, # 7 saniye sonra silinecek
+            data={'chat_id': sent_photo_message.chat_id, 'message_id': sent_photo_message.message_id}
+        )
+    logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} /welcome komutunu kullandı. Görsel yanıtı silinmek üzere zamanlandı (eğer gönderildiyse).")
 
 
 # ✔ KOMUT ADI SADECE BURADA DEĞİŞTİRİLDİ
@@ -279,21 +321,37 @@ async def clear_punishments_command(update: Update, context: ContextTypes.DEFAUL
 
 
 async def mehter_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Mehter Marşı MP3'ünü gönderir."""
+    """Mehter Marşı MP3'ünü gönderir, komut mesajını ve gönderilen sesi siler."""
+    await update.message.delete() # Kullanıcının komut mesajını sil
     chat_id = update.message.chat_id
     user_id, display_name, _ = get_user_display_name_and_storage_name(update)
     logger.info(f"[{datetime.datetime.now()}] Kullanıcı {display_name} ({user_id}) /mehter komutunu kullandı.")
     
     try:
         with open(MEHTER_MP3_PATH, 'rb') as audio_file:
-            await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Mehter Marşı çalıyor!")
-        logger.info(f"[{datetime.datetime.now()}] Mehter Marşı '{MEHTER_MP3_PATH}' başarıyla gönderildi.")
+            sent_audio_message = await context.bot.send_audio(chat_id=chat_id, audio=audio_file, caption="ZeaLouS: Mehter Marşı çalıyor!")
+            context.job_queue.run_once(
+                delete_message_job,
+                7, # 7 saniye sonra silinecek
+                data={'chat_id': sent_audio_message.chat_id, 'message_id': sent_audio_message.message_id}
+            )
+        logger.info(f"[{datetime.datetime.now()}] Mehter Marşı '{MEHTER_MP3_PATH}' başarıyla gönderildi ve silinmek üzere zamanlandı.")
     except FileNotFoundError:
         logger.error(f"[{datetime.datetime.now()}] Mehter Marşı dosyası bulunamadı: {MEHTER_MP3_PATH}")
-        await update.message.reply_text("ZeaLouS: Mehter Marşı dosyası bulunamadı.")
+        sent_error_message = await update.message.reply_text("ZeaLouS: Mehter Marşı dosyası bulunamadı.")
+        context.job_queue.run_once(
+            delete_message_job,
+            7, # 7 saniye sonra silinecek
+            data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
+        )
     except Exception as e:
         logger.error(f"[{datetime.datetime.now()}] Mehter Marşı gönderilirken hata oluştu: {e}")
-        await update.message.reply_text("ZeaLouS: Mehter Marşı gönderilirken bir hata oluştu.")
+        sent_error_message = await update.message.reply_text("ZeaLouS: Mehter Marşı gönderilirken bir hata oluştu.")
+        context.job_queue.run_once(
+            delete_message_job,
+            7, # 7 saniye sonra silinecek
+            data={'chat_id': sent_error_message.chat_id, 'message_id': sent_error_message.message_id}
+        )
 
 
 def main() -> None:
@@ -309,7 +367,7 @@ def main() -> None:
     application.add_handler(CommandHandler("rules", rules_command))
     application.add_handler(CommandHandler("not", notes_command))
     application.add_handler(CommandHandler("hatirlat", reminders_command))
-    application.add_handler(CommandHandler("istatistik", statistics_command))
+    application.add_handler(CommandHandler("istatistik", statistics_command)) # Değiştirildi
     application.add_handler(CommandHandler("oyunsaati", game_time_command))
     application.add_handler(CommandHandler("hello", hello_command))
     application.add_handler(CommandHandler("goodmorning", goodmorning_command))
@@ -318,6 +376,9 @@ def main() -> None:
 
     application.add_handler(CommandHandler("cezatemizle", clear_punishments_command))
     application.add_handler(CommandHandler("mehter", mehter_command))
+
+    # Yeni: İstatistik butonları için CallbackQueryHandler eklendi
+    application.add_handler(CallbackQueryHandler(stats.handle_stats_callback, pattern='^stats_'))
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 

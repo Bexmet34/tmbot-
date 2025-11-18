@@ -1,408 +1,293 @@
 import sqlite3
 import datetime
-from config import DB_PATH # DB_PATH'i config.py dosyasından içe aktarıyoruz
-
 import logging
-from collections import defaultdict
+import json
+
+from config import DB_PATH
 
 logger = logging.getLogger(__name__)
 
-def _connect_db():
-    """Veritabanına bağlanır ve bağlantı nesnesini döndürür."""
-    return sqlite3.connect(DB_PATH)
+def get_db_connection():
+    """Veritabanı bağlantısı sağlar."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row # Sütun isimleriyle erişim için
+    return conn
 
 def create_tables():
-    """Gerekli tüm veritabanı tablolarını oluşturur."""
-    conn = _connect_db()
+    """Gerekli veritabanı tablolarını oluşturur."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-
-    # Kullanıcı bilgileri tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id TEXT PRIMARY KEY,
+            username TEXT,
             display_name TEXT,
-            first_seen TEXT,
-            last_seen TEXT
+            first_name TEXT,
+            last_name TEXT,
+            is_bot INTEGER DEFAULT 0,
+            last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
-    # Mevcut 'users' tablosu şemasını güncelle (sütunlar yoksa ekle)
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN first_seen TEXT")
-    except sqlite3.OperationalError:
-        pass # Sütun zaten var
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN last_seen TEXT")
-    except sqlite3.OperationalError:
-        pass # Sütun zaten var
-
-    # Mesaj log tablosu (eski message_stats yerine)
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS message_log (
+        CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT,
-            timestamp TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     ''')
-
-    # Ceza bilgileri tablosu
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS punishments (
-            user_id TEXT PRIMARY KEY,
-            strike_count INTEGER DEFAULT 0,
-            is_muted BOOLEAN DEFAULT 0,
-            mute_until TEXT,
-            next_mute_type TEXT DEFAULT '5_min',
-            total_mutes_served INTEGER DEFAULT 0,
-            FOREIGN KEY (user_id) REFERENCES users (user_id)
-        )
-    ''')
-
-    # Mevcut 'punishments' tablosu şemasını güncelle (sütunlar yoksa ekle)
-    try:
-        cursor.execute("ALTER TABLE punishments ADD COLUMN strike_count INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE punishments ADD COLUMN is_muted BOOLEAN DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE punishments ADD COLUMN mute_until TEXT")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE punishments ADD COLUMN next_mute_type TEXT DEFAULT '5_min'")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE punishments ADD COLUMN total_mutes_served INTEGER DEFAULT 0")
-    except sqlite3.OperationalError:
-        pass
-
-    # Notlar tablosu
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            note_text TEXT,
-            created_at TEXT,
-            FOREIGN KEY (user_id) REFERENCES users (user_id)
-        )
-    ''')
-
-    # Hatırlatıcılar tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS reminders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT,
             reminder_text TEXT,
-            remind_at TEXT,
-            created_at TEXT,
+            remind_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     ''')
-
-    # Mevcut 'reminders' tablosu şemasını güncelle (sütunlar yoksa ekle)
-    try:
-        cursor.execute("ALTER TABLE reminders ADD COLUMN reminder_text TEXT")
-    except sqlite3.OperationalError:
-        pass # Sütun zaten var
-    try:
-        cursor.execute("ALTER TABLE reminders ADD COLUMN remind_at TEXT")
-    except sqlite3.OperationalError:
-        pass # Sütun zaten var
-    try:
-        cursor.execute("ALTER TABLE reminders ADD COLUMN created_at TEXT")
-    except sqlite3.OperationalError:
-        pass # Sütun zaten var
-
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS punishments (
+            user_id TEXT PRIMARY KEY,
+            strike_count INTEGER DEFAULT 0,
+            is_muted INTEGER DEFAULT 0,
+            mute_until TIMESTAMP,
+            next_mute_type TEXT DEFAULT '5_min', -- '5_min', '1_hr', '1_hr_served'
+            total_mutes_served INTEGER DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
     conn.commit()
     conn.close()
     logger.info("Veritabanı tabloları kontrol edildi/oluşturuldu.")
 
-def update_user_info(user_id: str, display_name: str):
-    """Kullanıcı bilgilerini (display_name) günceller veya yeni kullanıcı ekler."""
-    conn = _connect_db()
+def update_user_info(user_id: str, username: str, first_name: str = None, last_name: str = None, is_bot: bool = False):
+    """Kullanıcı bilgilerini günceller veya ekler."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    now = datetime.datetime.now().isoformat()
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-    user = cursor.fetchone()
-    if user:
-        cursor.execute("UPDATE users SET display_name = ?, last_seen = ? WHERE user_id = ?",
-                       (display_name, now, user_id))
-    else:
-        cursor.execute("INSERT INTO users (user_id, display_name, first_seen, last_seen) VALUES (?, ?, ?, ?)",
-                       (user_id, display_name, now, now))
-        # Yeni kullanıcı eklendiğinde boş ceza kaydı da oluştur
-        cursor.execute("INSERT INTO punishments (user_id) VALUES (?)", (user_id,))
+    
+    display_name = first_name if first_name else username
+    if last_name:
+        display_name += f" {last_name}"
+
+    cursor.execute('''
+        INSERT OR REPLACE INTO users 
+        (user_id, username, display_name, first_name, last_name, is_bot, last_activity)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ''', (user_id, username, display_name, first_name, last_name, int(is_bot)))
     conn.commit()
     conn.close()
 
-def get_user_display_names() -> dict:
-    """Tüm kullanıcıların ID'lerinden görünen isimlerine bir sözlük döndürür."""
-    conn = _connect_db()
+def get_user_display_names():
+    """Tüm kullanıcıların user_id'sine göre display_name'ini içeren bir sözlük döndürür."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, display_name FROM users")
-    users = {row[0]: row[1] for row in cursor.fetchall()}
+    cursor.execute('SELECT user_id, display_name FROM users')
+    users = cursor.fetchall()
     conn.close()
-    return users
+    return {user['user_id']: user['display_name'] for user in users}
 
-def add_message_record(user_id: str):
-    """Kullanıcının her mesajını zaman damgasıyla kaydeder."""
-    conn = _connect_db()
+def get_punishment_data(user_id: str):
+    """Kullanıcının ceza verilerini alır. Yoksa varsayılan değerlerle oluşturur."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    now = datetime.datetime.now().isoformat()
-    cursor.execute("INSERT INTO message_log (user_id, timestamp) VALUES (?, ?)", (user_id, now))
-    conn.commit()
-    conn.close()
-
-def get_leaderboard(period: str) -> list:
-    """Belirtilen periyoda göre (daily, weekly, monthly) lider tablosunu döndürür."""
-    conn = _connect_db()
-    cursor = conn.cursor()
-    now = datetime.datetime.now()
-    start_date = None
-
-    if period == 'daily':
-        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == 'weekly':
-        start_date = now - datetime.timedelta(days=now.weekday())
-        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == 'monthly':
-        start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    if not start_date:
-        conn.close()
-        return []
-
-    start_date_str = start_date.isoformat()
-    cursor.execute("""
-        SELECT user_id, COUNT(*) as msg_count
-        FROM message_log
-        WHERE timestamp >= ?
-        GROUP BY user_id
-        ORDER BY msg_count DESC
-        LIMIT 3
-    """, (start_date_str,))
-    
-    leaderboard = cursor.fetchall()
-    conn.close()
-    return leaderboard
-
-def get_user_overall_rank(user_id: str) -> tuple:
-    """Kullanıcının genel mesaj sıralamasını döndürür."""
-    conn = _connect_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT user_id, COUNT(*) as msg_count
-        FROM message_log
-        GROUP BY user_id
-        ORDER BY msg_count DESC
-    """)
-    all_users_by_rank = cursor.fetchall()
-    conn.close()
-    
-    rank = 0
-    for i, (uid, count) in enumerate(all_users_by_rank, 1):
-        if str(uid) == str(user_id):
-            rank = i
-            break
-            
-    return rank, len(all_users_by_rank)
-
-def get_total_user_message_count(user_id: str) -> int:
-    """Kullanıcının toplam mesaj sayısını döndürür."""
-    conn = _connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM message_log WHERE user_id = ?", (user_id,))
-    count = cursor.fetchone()
-    conn.close()
-    return count[0] if count else 0
-
-def get_statistics(user_id):
-    """Kullanıcının kişisel istatistiklerini ve lider tablolarını formatlanmış bir metin olarak döndürür."""
-    conn = _connect_db()
-    cursor = conn.cursor()
-
-    # Kişisel bilgileri al
-    cursor.execute("SELECT display_name FROM users WHERE user_id = ?", (user_id,))
-    display_name_row = cursor.fetchone()
-    display_name = display_name_row[0] if display_name_row else f"Kullanıcı {user_id}"
-
-    cursor.execute("SELECT strike_count, total_mutes_served FROM punishments WHERE user_id = ?", (user_id,))
-    punishment_data = cursor.fetchone()
-    strike_count = punishment_data[0] if punishment_data else 0
-    total_mutes = punishment_data[1] if punishment_data else 0
-    conn.close()
-
-    message_count = get_total_user_message_count(user_id)
-
-    # Kişisel istatistik metnini oluştur
-    stats_text = (
-        f"📊 Kişisel İstatistiklerin:\n"
-        f"  Adın: {display_name}\n"
-        f"  Toplam Mesaj: {message_count}\n"
-        f"  Mevcut İhlal Sayısı: {strike_count}\n"
-        f"  Toplam Susturulma: {total_mutes}\n\n"
-    )
-
-    # Lider tabloları için tüm kullanıcı adlarını al
-    user_names = get_user_display_names()
-
-    def format_leaderboard(title: str, period: str) -> str:
-        leaderboard_data = get_leaderboard(period)
-        text = f"🏆 {title} Lider Tablosu:\n"
-        if not leaderboard_data:
-            text += "  - Henüz veri yok.\n"
-        else:
-            for i, (uid, count) in enumerate(leaderboard_data, 1):
-                name = user_names.get(str(uid), f"Kullanıcı {uid}")
-                text += f"  {i}. {name}: {count} mesaj\n"
-        return text
-
-    stats_text += format_leaderboard("Günlük", "daily")
-    stats_text += "\n"
-    stats_text += format_leaderboard("Haftalık", "weekly")
-    stats_text += "\n"
-    stats_text += format_leaderboard("Aylık", "monthly")
-    stats_text += "\n"
-
-    # Kullanıcının genel sıralamasını ekle
-    rank, total_users = get_user_overall_rank(user_id)
-    if rank > 0:
-        stats_text += f"Sıralaman: {total_users} kişi arasında {rank}. sıradasın."
-    else:
-        stats_text += "Genel sıralamada yer almak için henüz mesaj göndermediniz."
-
-    return stats_text
-
-
-def get_punishment_data(user_id: str) -> dict:
-    """Belirli bir kullanıcının ceza bilgilerini döndürür."""
-    conn = _connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT strike_count, is_muted, mute_until, next_mute_type, total_mutes_served FROM punishments WHERE user_id = ?", (user_id,))
+    cursor.execute('SELECT * FROM punishments WHERE user_id = ?', (user_id,))
     data = cursor.fetchone()
     conn.close()
 
     if data:
-        mute_until = datetime.datetime.fromisoformat(data[2]) if data[2] else None
-        return {
-            'strike_count': data[0],
-            'is_muted': bool(data[1]),
-            'mute_until': mute_until,
-            'next_mute_type': data[3],
-            'total_mutes_served': data[4]
-        }
+        return dict(data)
     else:
         # Varsayılan değerlerle yeni bir giriş oluştur
-        save_punishment_data(user_id, {'strike_count': 0, 'is_muted': False, 'mute_until': None, 'next_mute_type': '5_min', 'total_mutes_served': 0})
-        return {'strike_count': 0, 'is_muted': False, 'mute_until': None, 'next_mute_type': '5_min', 'total_mutes_served': 0}
-
+        default_data = {
+            'user_id': user_id,
+            'strike_count': 0,
+            'is_muted': False,
+            'mute_until': None,
+            'next_mute_type': '5_min',
+            'total_mutes_served': 0
+        }
+        save_punishment_data(user_id, default_data) # Veritabanına kaydet
+        return default_data
 
 def save_punishment_data(user_id: str, data: dict):
-    """Belirli bir kullanıcının ceza bilgilerini kaydeder/günceller."""
-    conn = _connect_db()
+    """Kullanıcının ceza verilerini kaydeder."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    mute_until_str = data['mute_until'].isoformat() if data['mute_until'] else None
-    
-    cursor.execute("INSERT OR IGNORE INTO punishments (user_id, strike_count, is_muted, mute_until, next_mute_type, total_mutes_served) VALUES (?, ?, ?, ?, ?, ?)",
-                   (user_id, data['strike_count'], data['is_muted'], mute_until_str, data['next_mute_type'], data['total_mutes_served']))
-    cursor.execute("UPDATE punishments SET strike_count = ?, is_muted = ?, mute_until = ?, next_mute_type = ?, total_mutes_served = ? WHERE user_id = ?",
-                   (data['strike_count'], data['is_muted'], mute_until_str, data['next_mute_type'], data['total_mutes_served'], user_id))
+    cursor.execute('''
+        INSERT OR REPLACE INTO punishments 
+        (user_id, strike_count, is_muted, mute_until, next_mute_type, total_mutes_served)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (
+        user_id,
+        data.get('strike_count', 0),
+        int(data.get('is_muted', False)),
+        data.get('mute_until'), # datetime nesnesi direk kaydedilebilir
+        data.get('next_mute_type', '5_min'),
+        data.get('total_mutes_served', 0)
+    ))
     conn.commit()
     conn.close()
 
 def clear_user_punishments(user_id: str):
-    """Belirli bir kullanıcının tüm ceza sayaçlarını ve susturma durumunu sıfırlar."""
-    conn = _connect_db()
+    """Bir kullanıcının tüm ceza verilerini sıfırlar."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM punishments WHERE user_id = ?", (user_id,))
+    cursor.execute('DELETE FROM punishments WHERE user_id = ?', (user_id,))
     conn.commit()
     conn.close()
-    logger.info(f"Kullanıcı {user_id} için tüm cezalar sıfırlandı.")
+    logger.info(f"Kullanıcı {user_id} için cezalar temizlendi.")
 
-
-def add_note(user_id: str, note_text: str):
-    """Kullanıcıya yeni bir not ekler."""
-    conn = _connect_db()
+def add_message_record(user_id: str):
+    """Bir kullanıcı mesaj attığında kayıt ekler."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    now = datetime.datetime.now().isoformat()
-    cursor.execute("INSERT INTO notes (user_id, note_text, created_at) VALUES (?, ?, ?)",
-                   (user_id, note_text, now))
+    cursor.execute('INSERT INTO messages (user_id) VALUES (?)', (user_id,))
     conn.commit()
     conn.close()
-
-def get_notes(user_id: str):
-    conn = _connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, note_text, created_at FROM notes WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
-    notes = [{"id": row[0], "note_text": row[1], "created_at": row[2]} for row in cursor.fetchall()]
-    conn.close()
-    return notes
-
-def delete_note(note_id, user_id):
-    conn = _connect_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, user_id))
-    rows_affected = cursor.rowcount
-    conn.commit()
-    conn.close()
-    return rows_affected > 0
 
 def add_reminder(user_id: str, reminder_text: str, remind_at: datetime.datetime):
-    """Kullanıcıya yeni bir hatırlatıcı ekler."""
-    conn = _connect_db()
+    """Yeni bir hatırlatıcı ekler."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    now = datetime.datetime.now().isoformat()
-    remind_at_str = remind_at.isoformat()
-    cursor.execute("INSERT INTO reminders (user_id, reminder_text, remind_at, created_at) VALUES (?, ?, ?, ?)",
-                   (user_id, reminder_text, remind_at_str, now))
+    cursor.execute('''
+        INSERT INTO reminders (user_id, reminder_text, remind_at)
+        VALUES (?, ?, ?)
+    ''', (user_id, reminder_text, remind_at))
     conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+    return new_id
+
+def get_all_reminders():
+    """Tüm hatırlatıcıları kullanıcı ID'sine göre gruplayarak döndürür."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, user_id, reminder_text, remind_at FROM reminders')
+    reminders = cursor.fetchall()
     conn.close()
 
-def get_all_reminders() -> defaultdict:
-    """Tüm aktif hatırlatıcıları kullanıcı ID'sine göre gruplandırarak döndürür."""
-    conn = _connect_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, user_id, reminder_text, remind_at FROM reminders")
-    
-    reminders_by_user = {}
-    for row in cursor.fetchall():
-        remind_at = datetime.datetime.fromisoformat(row[3])
-        user_id = row[1]
-        if user_id not in reminders_by_user:
-            reminders_by_user[user_id] = []
-        reminders_by_user[user_id].append({
-            "id": row[0],
-            "user_id": user_id,
-            "reminder_text": row[2],
-            "remind_at": remind_at
-        })
-    conn.close()
-    return reminders_by_user
+    grouped_reminders = defaultdict(list)
+    for r in reminders:
+        # 'remind_at' string olarak geliyor, datetime objesine dönüştür
+        r_dict = dict(r)
+        if isinstance(r_dict['remind_at'], str):
+            try:
+                r_dict['remind_at'] = datetime.datetime.strptime(r_dict['remind_at'], '%Y-%m-%d %H:%M:%S.%f')
+            except ValueError:
+                r_dict['remind_at'] = datetime.datetime.strptime(r_dict['remind_at'], '%Y-%m-%d %H:%M:%S')
+        grouped_reminders[r_dict['user_id']].append(r_dict)
+    return grouped_reminders
 
 def remove_reminder(reminder_id: int):
     """Belirtilen ID'ye sahip hatırlatıcıyı siler."""
-    conn = _connect_db()
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+    cursor.execute('DELETE FROM reminders WHERE id = ?', (reminder_id,))
     conn.commit()
     conn.close()
 
-def get_reminders_for_user(user_id: str):
-    conn = _connect_db()
+# Yeni istatistik fonksiyonları
+def get_total_messages_count() -> int:
+    """Tüm sohbetlerde gönderilen toplam mesaj sayısını döndürür."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, reminder_text, remind_at FROM reminders WHERE user_id = ? ORDER BY remind_at ASC", (user_id,))
-    reminders = []
-    for row in cursor.fetchall():
-        remind_at = datetime.datetime.fromisoformat(row[2])
-        reminders.append({
-            "id": row[0],
-            "reminder_text": row[1],
-            "remind_at": remind_at
-        })
+    cursor.execute('SELECT COUNT(*) FROM messages')
+    count = cursor.fetchone()[0]
     conn.close()
-    return reminders
+    return count
+
+def get_total_unique_users_count() -> int:
+    """Toplam benzersiz kullanıcı sayısını döndürür."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(DISTINCT user_id) FROM users')
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+def get_active_users_last_24_hours() -> int:
+    """Son 24 saat içinde mesaj gönderen benzersiz kullanıcı sayısını döndürür."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    twenty_four_hours_ago = datetime.datetime.now() - datetime.timedelta(hours=24)
+    cursor.execute(
+        'SELECT COUNT(DISTINCT user_id) FROM messages WHERE timestamp >= ?',
+        (twenty_four_hours_ago,)
+    )
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+def get_top_message_senders(limit: int = 5) -> list[tuple[str, int]]:
+    """En çok mesaj gönderen kullanıcıları (display_name, mesaj_sayısı) olarak döndürür."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT u.display_name, COUNT(m.id) as message_count
+        FROM messages m
+        JOIN users u ON m.user_id = u.user_id
+        GROUP BY u.user_id
+        ORDER BY message_count DESC
+        LIMIT ?
+    ''', (limit,))
+    top_senders = cursor.fetchall()
+    conn.close()
+    return [(row['display_name'], row['message_count']) for row in top_senders]
+
+def get_user_stats(user_id: str) -> dict:
+    """Belirli bir kullanıcının mesaj ve ceza istatistiklerini döndürür."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    user_info = cursor.execute('SELECT display_name FROM users WHERE user_id = ?', (user_id,)).fetchone()
+    if not user_info:
+        conn.close()
+        return {'display_name': 'Bilinmeyen Kullanıcı', 'message_count': 0, 'strike_count': 0, 'is_muted': False, 'mute_until': None}
+
+    display_name = user_info['display_name']
+
+    message_count = cursor.execute(
+        'SELECT COUNT(*) FROM messages WHERE user_id = ?', (user_id,)
+    ).fetchone()[0]
+
+    punishment_data = get_punishment_data(user_id) # Zaten bir dict döndürüyor
+    
+    conn.close()
+    return {
+        'display_name': display_name,
+        'message_count': message_count,
+        'strike_count': punishment_data.get('strike_count', 0),
+        'is_muted': bool(punishment_data.get('is_muted', 0)),
+        'mute_until': punishment_data.get('mute_until')
+    }
+
+def get_statistics(user_id: str = None) -> str:
+    """
+    Genel istatistikler sağlar veya belirli bir kullanıcının istatistiklerini.
+    Bu fonksiyonu yeni detaylı istatistik fonksiyonları yerine kullanmayacağız.
+    """
+    total_messages = get_total_messages_count()
+    total_users = get_total_unique_users_count()
+    active_users_24h = get_active_users_last_24_hours()
+
+    stats_text = (
+        f"**Genel İstatistikler:**\n"
+        f"Toplam Mesaj: {total_messages}\n"
+        f"Toplam Kullanıcı: {total_users}\n"
+        f"Son 24 Saatte Aktif Kullanıcı: {active_users_24h}\n"
+    )
+    
+    if user_id:
+        user_stats = get_user_stats(user_id)
+        stats_text += (
+            f"\n**{user_stats['display_name']} Kullanıcı İstatistikleri:**\n"
+            f"Gönderilen Mesaj: {user_stats['message_count']}\n"
+            f"Mevcut İhlal Sayısı: {user_stats['strike_count']}\n"
+            f"Susturulmuş mu?: {'Evet' if user_stats['is_muted'] else 'Hayır'}\n"
+        )
+        if user_stats['is_muted'] and user_stats['mute_until']:
+            mute_until_dt = datetime.datetime.strptime(user_stats['mute_until'], '%Y-%m-%d %H:%M:%S.%f') if isinstance(user_stats['mute_until'], str) else user_stats['mute_until']
+            stats_text += f"Susturma Bitiş Tarihi: {mute_until_dt.strftime('%d.%m.%Y %H:%M:%S')}\n"
+
+    return stats_text
